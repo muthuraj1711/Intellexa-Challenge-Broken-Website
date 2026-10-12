@@ -1,0 +1,61 @@
+REELTIME MOVIE TICKET BOOKING — BUG ANSWER KEY
+
+Bug #1 — Difficulty 2/10
+Affected file & section: index.html / script.js, profile button
+User-facing symptom: Clicking the initials profile button has no response.
+Technical root cause: The profile button is presentation-only and has no click handler or associated profile panel.
+Exact code fix: Add a profile panel and toggle it from a handler, for example `document.querySelector('.profile-button').addEventListener('click',()=>document.querySelector('#profile-panel').hidden=false);` after adding a hidden element with id `profile-panel`.
+
+Bug #2 — Difficulty 2/10
+Affected file & section: index.html, movie catalog search input
+User-facing symptom: Typing a movie title into Search movies never narrows the movie list.
+Technical root cause: The event handler reads from the nonexistent `#movie-search-box` element instead of the input that fired the event, `#movie-search`; reading `.value` from null throws a TypeError.
+Exact code fix: In the movie-search input handler, replace `state.query=$('#movie-search-box').value` with `state.query=event.target.value`.
+
+Bug #3 — Difficulty 3/10
+Affected file & section: styles.css, responsive movie grid
+User-facing symptom: On narrow mobile screens, movie cards are squeezed into two columns and their content is cramped.
+Technical root cause: The small-screen media rule leaves the catalog grid at two columns rather than collapsing it to one.
+Exact code fix: Add `.movie-grid{grid-template-columns:1fr}` inside the `@media(max-width:650px)` block.
+
+Bug #4 — Difficulty 5/10
+Affected file & section: script.js, renderDates()
+User-facing symptom: Clicking a date changes the selected date label, but the date-specific showtime selection gets lost and the displayed slots remain generic.
+Technical root cause: `renderDates()` resets `state.dateIndex` to zero every time the date selection is rendered, including immediately after a date click.
+Exact code fix: Remove `state.dateIndex=0;` from the beginning of `renderDates()`; initialize it only when selecting a new movie (already done in selectMovie()).
+
+Bug #5 — Difficulty 5/10
+Affected file & section: script.js, checkout button enablement in updateSummary()
+User-facing symptom: Confirm booking remains disabled after choosing a seat and time.
+Technical root cause: The disabled condition mistakenly requires a promo code, even though promo codes are optional.
+Exact code fix: Replace `$('#checkout-button').disabled=state.seats.length===0||!state.time||!state.promo;` with `$('#checkout-button').disabled=state.seats.length===0||!state.time;`.
+
+Bug #6 — Difficulty 6/10
+Affected file & section: script.js, seat-map generation in renderSeats()
+User-facing symptom: The seat map reports the wrong seat labels for seats in the first row, leading to confusing booking confirmations.
+Technical root cause: Seat numbering uses the zero-based column index without adding one, so rows start at seat 0 and end at seat 9.
+Exact code fix: Change `number=index%10` to `number=index%10+1`.
+
+Bug #7 — Difficulty 9/10
+Affected file & section: script.js, promo calculation in updateSummary()
+User-facing symptom: Applying REEL10 produces a discount that is off by one rupee for some subtotals.
+Technical root cause: `Math.round()` rounds a percentage discount to the nearest rupee; checkout should consistently round down to avoid discounting more than 10%.
+Exact code fix: Change `Math.round(subtotal*.1)` to `Math.floor(subtotal*.1)`.
+
+Bug #8 — Difficulty 9/10
+Affected file & section: script.js, seat availability in renderSeats()
+User-facing symptom: Selecting a different movie or showtime continues to show seats as occupied according to the same hard-coded pattern, including seats that should be free for that show.
+Technical root cause: Occupancy is a single global fixed set and is not derived from the selected movie/date/time combination, so every show shares the same seat availability.
+Exact code fix: Replace `const occupied=new Set([2,3,8,14,15,27,28,36,47]);` with `const seed=[...`${state.movie?.id||''}-${state.dateIndex}-${state.time}`].reduce((n,c)=>n+c.charCodeAt(0),0);const occupied=new Set(Array.from({length:9},(_,i)=>(seed+i*7)%50));` to give each selected show a deterministic demo occupancy layout.
+
+Bug #9 — Difficulty 9.5/10
+Affected file & section: script.js, countdown expiry in startTimer()
+User-facing symptom: After the seat hold expires, the user can select seats again, but the countdown stays at 00:00 and never starts a fresh hold.
+Technical root cause: Expiry clears the interval and seats but does not reset the expired timer state or start a new hold when a seat is reselected.
+Exact code fix: In the `#seat-map` click handler, after adding a seat, restart the hold when expired: `if(state.seconds<=0&&state.seats.length){$('#timer').classList.remove('expired');startTimer()}`.
+
+Bug #10 — Difficulty 10/10
+Affected file & section: script.js, checkout confirmation in the checkout-button handler
+User-facing symptom: A confirmed booking can be opened again with stale seat selections and a still-running hold state; the confirmation is not committed as a completed client-side booking.
+Technical root cause: The handler only shows the modal and clears the timer. It leaves the booking state and checkout enabled, so repeated submits can “book” the same seats again.
+Exact code fix: In the checkout handler, after capturing the confirmation details, mark completion and reset the active booking: `state.seats=[]; state.time=''; state.snacks={}; state.promo=null; updateSummary(); renderSeats(); renderTimes(); renderSnacks();` and disable checkout until a new seat/time is selected. For a static front-end demo, this is the appropriate local completion state.
